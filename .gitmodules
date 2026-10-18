@@ -1,3 +1,6 @@
 [submodule "Sign-Language-Recognition--MediaPipe-DTW"]
 	path = Sign-Language-Recognition--MediaPipe-DTW
 	url = https://github.com/paulina-pvn/Sign-Language-Recognition--MediaPipe-DTW
+[submodule "Project-report-LaTeX"]
+	path = Project-report-LaTeX
+	url = https://github.com/paulina-pvn/Project-report-LaTeX.git
