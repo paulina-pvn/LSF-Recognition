@@ -4,6 +4,3 @@
 [submodule "Project-report-LaTeX"]
 	path = Project-report-LaTeX
 	url = https://github.com/paulina-pvn/Project-report-LaTeX.git
-[submodule "ASL-Language-Recognition"]
-	path = ASL-Language-Recognition
-	url = https://github.com/paulina-pvn/ASL-Language-Recognition.git
