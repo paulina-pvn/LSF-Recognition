@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f6f5f0" />
+    <title>Signé — apprendre la LSF</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="#accueil" aria-label="Signé, accueil">
+          <span class="brand-mark" aria-hidden="true">s<span>.</span></span>
+          <span>signé<span class="brand-period">.</span></span>
+        </a>
+        <div class="sidebar-label">ESPACE D’APPRENTISSAGE</div>
+        <nav class="nav" aria-label="Navigation principale">
+          <button class="nav-item active" data-page="accueil"><span class="nav-icon">⌂</span>Accueil</button>
+          <button class="nav-item" data-page="bibliotheque"><span class="nav-icon">▤</span>Ma bibliothèque <span class="nav-count" id="nav-count">0</span></button>
+        </nav>
+        <div class="sidebar-bottom">
+          <div class="side-note-icon">✳</div>
+          <p>Un signe à la fois.<br /><strong>À ton rythme.</strong></p>
+          <span class="version-label">PROTO­TYPE · LSF</span>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div class="breadcrumb">Mon espace <span>/</span> <strong id="breadcrumb-page">Accueil</strong></div>
+          <div class="profile-chip"><span class="profile-avatar">P</span><span>Paulina</span><span class="profile-chevron">⌄</span></div>
+        </header>
+
+        <section class="page active" id="page-accueil">
+          <div class="welcome-row">
+            <div>
+              <div class="eyebrow"><span class="eyebrow-dot"></span> TON ESPACE LSF</div>
+              <h1>Bonjour, Paulina <span class="wave">✳</span></h1>
+              <p class="intro">Chaque signe appris est un pas de plus vers une meilleure communication.</p>
+            </div>
+            <button class="button button-primary" id="add-open"><span class="plus">＋</span> Ajouter un signe</button>
+          </div>
+
+          <div class="stats-grid">
+            <article class="stat-card stat-violet"><div class="stat-top"><span class="stat-icon">▤</span><span class="stat-caption">DANS TA BIBLIOTHÈQUE</span></div><div class="stat-value" id="stat-total">0</div><div class="stat-foot">signe<span id="plural-total">s</span> de référence</div><span class="stat-deco deco-one">✳</span></article>
+            <article class="stat-card stat-peach"><div class="stat-top"><span class="stat-icon">✦</span><span class="stat-caption">DÉJÀ APPRIS</span></div><div class="stat-value" id="stat-learned">0</div><div class="stat-foot">à ton propre rythme</div><span class="stat-deco deco-two">✧</span></article>
+            <article class="stat-card stat-green"><div class="stat-top"><span class="stat-icon">↗</span><span class="stat-caption">TES POINTS</span></div><div class="stat-value"><span id="stat-points">0</span><small> XP</small></div><div class="stat-foot">+10 XP par signe révisé</div><span class="stat-deco deco-three">✳</span></article>
+          </div>
+
+          <section class="content-section practice-section">
+            <div class="section-heading"><div><div class="eyebrow">ON S’Y MET ?</div><h2>À pratiquer</h2></div><button class="text-button" data-goto="bibliotheque">Voir ma bibliothèque <span>→</span></button></div>
+            <div class="practice-grid" id="practice-grid"></div>
+          </section>
+
+          <section class="tip-banner">
+            <div class="tip-spark">✳</div><div><div class="tip-kicker">PETIT RAPPEL</div><p>Observe le mouvement, prends ton temps, puis essaie de le reproduire.</p></div><span class="tip-decoration">✧</span>
+          </section>
+        </section>
+
+        <section class="page" id="page-bibliotheque">
+          <div class="welcome-row library-heading">
+            <div><div class="eyebrow"><span class="eyebrow-dot"></span> TON CONTENU</div><h1>Ma bibliothèque</h1><p class="intro">Tes références pour apprendre et réviser les signes.</p></div>
+            <button class="button button-primary" id="add-open-library"><span class="plus">＋</span> Ajouter un signe</button>
+          </div>
+          <div class="library-toolbar"><div class="library-count"><strong id="library-total">0 signe</strong><span>· tes médias restent sur cet appareil</span></div><label class="search-box"><span>⌕</span><input id="search" type="search" placeholder="Rechercher un signe…" aria-label="Rechercher un signe" /></label></div>
+          <div class="library-grid" id="library-grid"></div>
+        </section>
+
+        <footer class="footer"><span>signé<span class="brand-period">.</span> · Prototype d’apprentissage de la LSF</span><span>Une première étape, construite avec soin <span class="footer-heart">♥</span></span></footer>
+      </main>
+    </div>
+
+    <dialog class="modal" id="add-dialog" aria-labelledby="add-title">
+      <form id="add-form" class="modal-card">
+        <button class="close-button" type="button" data-close="add-dialog" aria-label="Fermer">×</button>
+        <div class="eyebrow"><span class="eyebrow-dot"></span> TA COLLECTION</div><h2 id="add-title">Ajouter un signe</h2><p class="modal-intro">Ajoute un média de référence pour pouvoir le regarder et t’entraîner.</p>
+        <label class="field-label" for="sign-name">Nom du signe</label><input class="text-input" id="sign-name" name="name" placeholder="Ex. Bonjour" maxlength="50" required />
+        <label class="field-label" for="sign-category">Thème <span class="optional">(facultatif)</span></label><select class="text-input" id="sign-category" name="category"><option>Salutations</option><option>Vie quotidienne</option><option>Émotions</option><option>À apprendre</option><option>Autre</option></select>
+        <label class="field-label">Photo ou vidéo de référence</label>
+        <label class="upload-zone" for="sign-file"><span class="upload-icon">↑</span><strong id="upload-title">Choisir un fichier</strong><span id="upload-caption">Image ou vidéo · 100 Mo max</span><input id="sign-file" name="media" type="file" accept="image/*,video/*" required /></label>
+        <div class="form-error" id="form-error" role="alert"></div>
+        <button class="button button-primary button-wide" type="submit">Ajouter à ma bibliothèque <span>→</span></button>
+        <p class="privacy-note">🔒 Tes fichiers restent enregistrés dans ce navigateur.</p>
+      </form>
+    </dialog>
+
+    <dialog class="modal practice-modal" id="practice-dialog" aria-labelledby="practice-title">
+      <div class="modal-card practice-card"><button class="close-button" type="button" data-close="practice-dialog" aria-label="Fermer">×</button><div class="eyebrow"><span class="eyebrow-dot"></span> TEMPS DE PRATIQUE</div><div class="practice-progress"><span id="practice-step">ÉTAPE 1 SUR 2</span><div><i></i></div></div><h2 id="practice-title">Observe le signe</h2><p class="modal-intro" id="practice-description">Regarde attentivement la référence, puis essaie de la reproduire.</p><div class="practice-media" id="practice-media"></div><div class="practice-actions" id="practice-actions"><button class="button button-soft" type="button" data-close="practice-dialog">Je le ferai plus tard</button><button class="button button-primary" type="button" id="practice-next">J’ai observé <span>→</span></button></div></div>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="app.js"></script>
+  </body>
+</html>
