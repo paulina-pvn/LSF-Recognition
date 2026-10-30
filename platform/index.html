@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#f6f5f0" />
     <title>Learn LSF — apprendre la LSF</title>
-    <link rel="stylesheet" href="styles.css" />
-    <link rel="stylesheet" href="calm.css" />
+    <link rel="stylesheet" href="styles.css?v=3" />
+    <link rel="stylesheet" href="calm.css?v=3" />
   </head>
   <body>
     <div class="app-shell">
@@ -19,6 +19,7 @@
         <nav class="nav" aria-label="Navigation principale">
           <button class="nav-item active" data-page="accueil"><span class="nav-icon">⌂</span>Accueil</button>
           <button class="nav-item" data-page="bibliotheque"><span class="nav-icon">▤</span>Ma bibliothèque <span class="nav-count" id="nav-count">0</span></button>
+          <button class="nav-item" data-page="pratique"><span class="nav-icon">◉</span>Pratiquer</button>
         </nav>
         <div class="sidebar-bottom">
           <div class="side-note-icon">LSF</div>
@@ -54,7 +55,7 @@
             <div class="practice-grid" id="practice-grid"></div>
           </section>
 
-          <section class="daily-challenge" aria-labelledby="daily-title">
+          <section class="daily-challenge" id="daily-challenge" aria-labelledby="daily-title">
             <div class="challenge-icon" aria-hidden="true">✦</div>
             <div class="challenge-copy"><div class="eyebrow">PETIT DÉFI DU JOUR</div><h2 id="daily-title">Trois pratiques, à ton rythme</h2><p id="daily-caption">Chaque répétition compte. Tu peux réviser le même signe plusieurs fois.</p></div>
             <div class="challenge-progress"><div><strong id="daily-count">0</strong><span> / 3</span></div><div class="progress-track"><i id="daily-progress"></i></div></div>
@@ -75,13 +76,39 @@
           <div class="library-grid" id="library-grid"></div>
         </section>
 
+        <section class="page" id="page-pratique">
+          <div class="practice-page-heading">
+            <button class="back-link" id="practice-back">← <span>Ma bibliothèque</span></button>
+            <div class="eyebrow"><span class="eyebrow-dot"></span> À TOI DE JOUER</div>
+            <h1 id="practice-page-title">Pratiquer un signe</h1>
+            <p class="intro">Regarde la référence et entraîne-toi en même temps devant ta caméra.</p>
+          </div>
+          <div class="practice-view-grid">
+            <article class="practice-panel">
+              <div class="panel-heading"><div><span class="panel-step">01</span><h2>La référence</h2></div><span class="panel-hint">Regarde et écoute</span></div>
+              <div class="reference-stage" id="practice-reference"><div class="reference-empty">La référence apparaîtra ici.</div></div>
+            </article>
+            <article class="practice-panel">
+              <div class="panel-heading"><div><span class="panel-step">02</span><h2>Ta pratique</h2></div><span class="camera-status" id="camera-status"><i></i> Caméra désactivée</span></div>
+              <div class="camera-stage" id="camera-stage">
+                <div class="camera-placeholder" id="camera-placeholder"><span class="camera-placeholder-icon">◉</span><strong>Ton aperçu apparaîtra ici</strong><p>Active ta caméra pour te voir pendant la vidéo.</p></div>
+                <video id="webcam-feed" autoplay playsinline muted hidden></video>
+                <span class="live-badge" id="live-badge" hidden><i></i> EN DIRECT</span>
+              </div>
+              <div class="camera-controls"><button class="button button-primary" id="camera-start">Activer ma caméra</button><button class="button button-soft" id="camera-stop" hidden>Éteindre la caméra</button><span class="camera-note">Aucune image n’est enregistrée.</span></div>
+            </article>
+          </div>
+          <div class="practice-page-actions"><p>Prends ton temps. Quand tu as fini, valide ta pratique.</p><button class="button button-primary" id="practice-finish">J’ai terminé <span>✓</span></button></div>
+          <p class="camera-error" id="camera-error" role="status" aria-live="polite"></p>
+        </section>
+
         <footer class="footer"><span>Learn LSF · Prototype d’apprentissage</span><span>Une première version pour pratiquer la LSF</span></footer>
       </main>
     </div>
 
     <dialog class="modal" id="add-dialog" aria-labelledby="add-title">
       <form id="add-form" class="modal-card">
-        <button class="close-button" type="button" data-close="add-dialog" aria-label="Fermer">×</button>
+        <button class="close-button" type="submit" formmethod="dialog" formnovalidate aria-label="Fermer">×</button>
         <div class="eyebrow"><span class="eyebrow-dot"></span> TA COLLECTION</div><h2 id="add-title">Ajouter un signe</h2><p class="modal-intro">Ajoute un média de référence pour pouvoir le regarder et t’entraîner.</p>
         <label class="field-label" for="sign-name">Nom du signe</label><input class="text-input" id="sign-name" name="name" placeholder="Ex. Bonjour" maxlength="50" required />
         <label class="field-label" for="sign-category">Thème <span class="optional">(facultatif)</span></label><select class="text-input" id="sign-category" name="category"><option>Salutations</option><option>Vie quotidienne</option><option>Émotions</option><option>À apprendre</option><option>Autre</option></select>
@@ -93,11 +120,7 @@
       </form>
     </dialog>
 
-    <dialog class="modal practice-modal" id="practice-dialog" aria-labelledby="practice-title">
-      <div class="modal-card practice-card"><button class="close-button" type="button" data-close="practice-dialog" aria-label="Fermer">×</button><div class="eyebrow"><span class="eyebrow-dot"></span> TEMPS DE PRATIQUE</div><div class="practice-progress"><span id="practice-step">ÉTAPE 1 SUR 2</span><div><i></i></div></div><h2 id="practice-title">Observe le signe</h2><p class="modal-intro" id="practice-description">Regarde attentivement la référence, puis essaie de la reproduire.</p><div class="practice-media" id="practice-media"></div><div class="practice-actions" id="practice-actions"><button class="button button-soft" type="button" data-close="practice-dialog">Je le ferai plus tard</button><button class="button button-primary" type="button" id="practice-next">J’ai observé <span>→</span></button></div></div>
-    </dialog>
-
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app.js"></script>
+    <script src="app.js?v=4"></script>
   </body>
 </html>

@@ -5,7 +5,8 @@ const XP_KEY = "signe-learning-xp";
 const DAILY_KEY = "signe-learning-daily";
 let database;
 let currentPracticeId = null;
-let practiceStep = 1;
+let cameraStream = null;
+let referenceObjectUrl = null;
 let toastTimer;
 
 const $ = (selector) => document.querySelector(selector);
@@ -71,7 +72,7 @@ function mediaMarkup(sign, className = "") {
   const url = URL.createObjectURL(sign.blob);
   const label = sign.mediaType.startsWith("video/") ? "VIDÉO" : "PHOTO";
   const media = sign.mediaType.startsWith("video/")
-    ? `<video class="${className}" src="${url}" muted playsinline preload="metadata" ${className === "practice-preview" ? "controls" : ""}></video>`
+    ? `<video class="${className}" src="${url}" muted playsinline preload="metadata" ${className.startsWith("practice-") ? "controls" : ""}></video>`
     : `<img class="${className}" src="${url}" alt="Référence pour le signe ${escapeHtml(sign.name)}" />`;
   return { html: `${media}<span class="media-type">${label}</span>`, url };
 }
@@ -166,34 +167,88 @@ function openAddDialog() {
 async function startPractice(id) {
   const sign = (await getSigns()).find((entry) => entry.id === id);
   if (!sign) return;
+  stopCamera();
+  if (referenceObjectUrl) URL.revokeObjectURL(referenceObjectUrl);
   currentPracticeId = id;
-  practiceStep = 1;
-  $("#practice-title").textContent = `Observe : ${sign.name}`;
-  $("#practice-description").textContent = "Regarde attentivement la référence, puis essaie de la reproduire.";
-  $("#practice-step").textContent = "ÉTAPE 1 SUR 2";
-  $(".practice-progress i").style.width = "50%";
-  $("#practice-next").innerHTML = 'J’ai observé <span>→</span>';
-  const { html, url } = mediaMarkup(sign, "practice-preview");
-  const mediaHost = $("#practice-media");
+  $("#practice-page-title").textContent = sign.name;
+  $("#camera-error").textContent = "";
+  const { html, url } = mediaMarkup(sign, "practice-reference-media");
+  referenceObjectUrl = url;
+  const mediaHost = $("#practice-reference");
   mediaHost.innerHTML = html;
   const video = mediaHost.querySelector("video");
   if (video) video.muted = false;
-  $("#practice-dialog").dataset.objectUrl = url;
-  $("#practice-dialog").showModal();
+  navigateToPage("pratique");
+  enableCamera();
 }
 
-$("#practice-next").addEventListener("click", async () => {
-  if (practiceStep === 1) {
-    practiceStep = 2;
-    $("#practice-title").textContent = "À toi d’essayer !";
-    $("#practice-description").textContent = "Essaie de reproduire le signe en t’aidant de la référence, puis valide quand tu as terminé.";
-    $("#practice-step").textContent = "ÉTAPE 2 SUR 2";
-    $(".practice-progress i").style.width = "100%";
-    $("#practice-next").innerHTML = 'J’ai terminé <span>✓</span>';
+async function openPracticePage() {
+  const signs = await getSigns();
+  if (!signs.length) {
+    navigateToPage("bibliotheque");
+    showToast("Ajoute d’abord une photo ou une vidéo de référence pour pratiquer.");
     return;
   }
+  const sign = signs.find((entry) => !entry.learned) || signs[0];
+  startPractice(sign.id);
+}
+
+function stopCamera() {
+  if (cameraStream) cameraStream.getTracks().forEach((track) => track.stop());
+  cameraStream = null;
+  const feed = $("#webcam-feed");
+  if (!feed) return;
+  feed.srcObject = null;
+  feed.hidden = true;
+  $("#camera-placeholder").hidden = false;
+  $("#live-badge").hidden = true;
+  $("#camera-start").hidden = false;
+  $("#camera-stop").hidden = true;
+  $("#camera-status").classList.remove("active");
+  $("#camera-status").lastChild.textContent = " Caméra désactivée";
+}
+
+function clearPractice() {
+  stopCamera();
+  if (referenceObjectUrl) URL.revokeObjectURL(referenceObjectUrl);
+  referenceObjectUrl = null;
+  $("#practice-reference").replaceChildren();
+  currentPracticeId = null;
+}
+
+async function enableCamera() {
+  $("#camera-error").textContent = "";
+  if (!navigator.mediaDevices?.getUserMedia) {
+    $("#camera-error").textContent = "La caméra nécessite un navigateur compatible et une page sécurisée. Lance le site sur localhost.";
+    return;
+  }
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+    const feed = $("#webcam-feed");
+    feed.srcObject = cameraStream;
+    feed.hidden = false;
+    $("#camera-placeholder").hidden = true;
+    $("#live-badge").hidden = false;
+    $("#camera-start").hidden = true;
+    $("#camera-stop").hidden = false;
+    $("#camera-status").classList.add("active");
+    $("#camera-status").lastChild.textContent = " Caméra active";
+    await feed.play();
+  } catch (error) {
+    stopCamera();
+    const messages = {
+      NotAllowedError: "L’accès à la caméra a été refusé. Autorise-le dans les réglages du navigateur, puis réessaie.",
+      NotFoundError: "Aucune caméra n’a été trouvée sur cet appareil.",
+      NotReadableError: "La caméra est déjà utilisée par une autre application.",
+    };
+    $("#camera-error").textContent = messages[error.name] || "Impossible d’ouvrir la caméra. Vérifie ses autorisations et réessaie.";
+  }
+}
+
+async function finishPractice() {
   const signs = await getSigns();
   const sign = signs.find((entry) => entry.id === currentPracticeId);
+  if (!sign) return;
   const wasLearned = sign?.learned;
   if (sign && !sign.learned) {
     sign.learned = true;
@@ -210,11 +265,26 @@ $("#practice-next").addEventListener("click", async () => {
   } else {
     showToast(encouragements[Math.floor(Math.random() * encouragements.length)]);
   }
-  $("#practice-dialog").close();
+  clearPractice();
   await render();
-});
+  navigateToPage("bibliotheque");
+}
+
+function navigateToPage(page) {
+  if (page === "pratique" && !currentPracticeId) {
+    page = "bibliotheque";
+    showToast("Choisis un signe dans ta bibliothèque pour commencer.");
+  }
+  if (page !== "pratique" && currentPracticeId) clearPractice();
+  $$(".page").forEach((section) => section.classList.toggle("active", section.id === `page-${page}`));
+  $$(".nav-item").forEach((item) => item.classList.toggle("active", item.dataset.page === page));
+  const labels = { accueil: "Accueil", bibliotheque: "Ma bibliothèque", pratique: "Pratiquer" };
+  $("#breadcrumb-page").textContent = labels[page];
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
 
 $("#add-form").addEventListener("submit", async (event) => {
+  if (event.submitter?.formMethod === "dialog") return;
   event.preventDefault();
   const form = event.currentTarget;
   const name = $("#sign-name").value.trim();
@@ -266,25 +336,33 @@ $("#daily-start").addEventListener("click", async () => {
   startPractice(chosen.id);
 });
 
-$$("[data-close]").forEach((button) => button.addEventListener("click", () => $("#" + button.dataset.close).close()));
-$("#practice-dialog").addEventListener("close", (event) => {
-  const url = event.currentTarget.dataset.objectUrl;
-  if (url) URL.revokeObjectURL(url);
-  $("#practice-media").replaceChildren();
-});
+$("#camera-start").addEventListener("click", enableCamera);
+$("#camera-stop").addEventListener("click", stopCamera);
+$("#practice-finish").addEventListener("click", finishPractice);
+$("#practice-back").addEventListener("click", () => navigateToPage("bibliotheque"));
+
 $$('[data-page]').forEach((button) => button.addEventListener("click", () => {
-  const page = button.dataset.page;
-  $$(".page").forEach((section) => section.classList.toggle("active", section.id === `page-${page}`));
-  $$(".nav-item").forEach((item) => item.classList.toggle("active", item === button));
-  $("#breadcrumb-page").textContent = page === "accueil" ? "Accueil" : "Ma bibliothèque";
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  if (button.dataset.page === "pratique" && !currentPracticeId) {
+    openPracticePage();
+    return;
+  }
+  navigateToPage(button.dataset.page);
 }));
 $$('[data-goto="bibliotheque"]').forEach((button) => button.addEventListener("click", () => $('[data-page="bibliotheque"]').click()));
+window.addEventListener("beforeunload", stopCamera);
+window.addEventListener("unhandledrejection", (event) => {
+  console.error("Learn LSF action failed:", event.reason);
+  showToast("Une action n’a pas abouti. Recharge la page et réessaie.");
+});
 
 openDatabase().then(async (db) => {
   database = db;
   await render();
 }).catch((error) => {
-  console.error(error);
-  document.body.innerHTML = '<main style="font-family: sans-serif; max-width: 620px; margin: 12vh auto; padding: 24px"><h1>Ce navigateur ne permet pas le stockage local nécessaire</h1><p>Essaie de lancer le prototype depuis Terminal avec <code>python3 -m http.server 8000</code>, puis ouvre <code>http://localhost:8000</code>.</p></main>';
+  console.error("Learn LSF could not initialize:", error);
+  const notice = document.createElement("div");
+  notice.className = "app-error-notice";
+  notice.setAttribute("role", "alert");
+  notice.textContent = `Le stockage local n’a pas pu démarrer (${error.message || "erreur inconnue"}). Essaie avec un navigateur récent et ouvre le site sur localhost.`;
+  document.body.prepend(notice);
 });
