@@ -1,4 +1,4 @@
-# Prototype de plateforme LSF
+# Learn LSF — prototype de plateforme LSF
 
 Prototype front-end autonome en HTML, CSS et JavaScript. Il permet d’ajouter des photos ou des vidéos de référence, de les organiser dans une bibliothèque et de suivre une première progression d’apprentissage.
 
@@ -19,6 +19,7 @@ Puis ouvrir <http://localhost:8000> dans le navigateur. Pour arrêter le serveur
 - Bibliothèque consultable, filtrable et modifiable (suppression).
 - Parcours guidé en deux étapes : observer, puis reproduire le signe.
 - Progression locale : un signe marqué comme appris rapporte 10 XP.
+- Petit défi quotidien de trois pratiques, avec choix aléatoire d’un signe et animation de réussite.
 - Fichiers et progression enregistrés dans le navigateur de l’utilisateur avec IndexedDB et `localStorage`.
 
 ## Limites actuelles

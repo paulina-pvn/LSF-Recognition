@@ -4,18 +4,16 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#f6f5f0" />
-    <title>Signé — apprendre la LSF</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <title>Learn LSF — apprendre la LSF</title>
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="calm.css" />
   </head>
   <body>
     <div class="app-shell">
       <aside class="sidebar">
-        <a class="brand" href="#accueil" aria-label="Signé, accueil">
-          <span class="brand-mark" aria-hidden="true">s<span>.</span></span>
-          <span>signé<span class="brand-period">.</span></span>
+        <a class="brand" href="#accueil" aria-label="Learn LSF, accueil">
+          <span class="brand-mark" aria-hidden="true">L</span>
+          <span>Learn LSF</span>
         </a>
         <div class="sidebar-label">ESPACE D’APPRENTISSAGE</div>
         <nav class="nav" aria-label="Navigation principale">
@@ -23,7 +21,7 @@
           <button class="nav-item" data-page="bibliotheque"><span class="nav-icon">▤</span>Ma bibliothèque <span class="nav-count" id="nav-count">0</span></button>
         </nav>
         <div class="sidebar-bottom">
-          <div class="side-note-icon">✳</div>
+          <div class="side-note-icon">LSF</div>
           <p>Un signe à la fois.<br /><strong>À ton rythme.</strong></p>
           <span class="version-label">PROTO­TYPE · LSF</span>
         </div>
@@ -32,23 +30,23 @@
       <main class="main-content">
         <header class="topbar">
           <div class="breadcrumb">Mon espace <span>/</span> <strong id="breadcrumb-page">Accueil</strong></div>
-          <div class="profile-chip"><span class="profile-avatar">P</span><span>Paulina</span><span class="profile-chevron">⌄</span></div>
+          <div class="profile-chip" aria-label="Profil local"><span class="profile-avatar">P</span><span class="profile-name">Paulina<small>Profil local</small></span></div>
         </header>
 
         <section class="page active" id="page-accueil">
           <div class="welcome-row">
             <div>
               <div class="eyebrow"><span class="eyebrow-dot"></span> TON ESPACE LSF</div>
-              <h1>Bonjour, Paulina <span class="wave">✳</span></h1>
+              <h1>Bonjour, Paulina</h1>
               <p class="intro">Chaque signe appris est un pas de plus vers une meilleure communication.</p>
             </div>
             <button class="button button-primary" id="add-open"><span class="plus">＋</span> Ajouter un signe</button>
           </div>
 
           <div class="stats-grid">
-            <article class="stat-card stat-violet"><div class="stat-top"><span class="stat-icon">▤</span><span class="stat-caption">DANS TA BIBLIOTHÈQUE</span></div><div class="stat-value" id="stat-total">0</div><div class="stat-foot">signe<span id="plural-total">s</span> de référence</div><span class="stat-deco deco-one">✳</span></article>
-            <article class="stat-card stat-peach"><div class="stat-top"><span class="stat-icon">✦</span><span class="stat-caption">DÉJÀ APPRIS</span></div><div class="stat-value" id="stat-learned">0</div><div class="stat-foot">à ton propre rythme</div><span class="stat-deco deco-two">✧</span></article>
-            <article class="stat-card stat-green"><div class="stat-top"><span class="stat-icon">↗</span><span class="stat-caption">TES POINTS</span></div><div class="stat-value"><span id="stat-points">0</span><small> XP</small></div><div class="stat-foot">+10 XP par signe révisé</div><span class="stat-deco deco-three">✳</span></article>
+            <article class="stat-card stat-violet"><div class="stat-top"><span class="stat-icon">▤</span><span class="stat-caption">DANS TA BIBLIOTHÈQUE</span></div><div class="stat-value" id="stat-total">0</div><div class="stat-foot">signe<span id="plural-total">s</span> de référence</div></article>
+            <article class="stat-card stat-peach"><div class="stat-top"><span class="stat-icon">✓</span><span class="stat-caption">DÉJÀ APPRIS</span></div><div class="stat-value" id="stat-learned">0</div><div class="stat-foot">à ton propre rythme</div></article>
+            <article class="stat-card stat-green"><div class="stat-top"><span class="stat-icon">＋</span><span class="stat-caption">TES POINTS</span></div><div class="stat-value"><span id="stat-points">0</span><small> XP</small></div><div class="stat-foot">+10 XP par signe révisé</div></article>
           </div>
 
           <section class="content-section practice-section">
@@ -56,8 +54,15 @@
             <div class="practice-grid" id="practice-grid"></div>
           </section>
 
+          <section class="daily-challenge" aria-labelledby="daily-title">
+            <div class="challenge-icon" aria-hidden="true">✦</div>
+            <div class="challenge-copy"><div class="eyebrow">PETIT DÉFI DU JOUR</div><h2 id="daily-title">Trois pratiques, à ton rythme</h2><p id="daily-caption">Chaque répétition compte. Tu peux réviser le même signe plusieurs fois.</p></div>
+            <div class="challenge-progress"><div><strong id="daily-count">0</strong><span> / 3</span></div><div class="progress-track"><i id="daily-progress"></i></div></div>
+            <button class="button button-soft" id="daily-start">Choisir un signe <span>→</span></button>
+          </section>
+
           <section class="tip-banner">
-            <div class="tip-spark">✳</div><div><div class="tip-kicker">PETIT RAPPEL</div><p>Observe le mouvement, prends ton temps, puis essaie de le reproduire.</p></div><span class="tip-decoration">✧</span>
+            <div class="tip-spark">i</div><div><div class="tip-kicker">CONSEIL</div><p>Observe le mouvement, prends ton temps, puis essaie de le reproduire.</p></div>
           </section>
         </section>
 
@@ -70,7 +75,7 @@
           <div class="library-grid" id="library-grid"></div>
         </section>
 
-        <footer class="footer"><span>signé<span class="brand-period">.</span> · Prototype d’apprentissage de la LSF</span><span>Une première étape, construite avec soin <span class="footer-heart">♥</span></span></footer>
+        <footer class="footer"><span>Learn LSF · Prototype d’apprentissage</span><span>Une première version pour pratiquer la LSF</span></footer>
       </main>
     </div>
 
