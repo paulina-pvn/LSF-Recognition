@@ -4,8 +4,16 @@ const STORE_NAME = "signs";
 const XP_KEY = "signe-learning-xp";
 const DAILY_KEY = "signe-learning-daily";
 let database;
+let datasetSigns = [];
 let currentPracticeId = null;
 let cameraStream = null;
+let mediaRecorder = null;
+let recordedChunks = [];
+let recordingStartedAt = null;
+let practiceHasResult = false;
+let practiceRewarded = false;
+let recognizerReady = false;
+let healthPollTimer = null;
 let referenceObjectUrl = null;
 let toastTimer;
 
@@ -34,7 +42,21 @@ function storeRequest(mode, action) {
   });
 }
 
-const getSigns = () => storeRequest("readonly", (store) => store.getAll());
+async function getSigns() {
+  const savedSigns = await storeRequest("readonly", (store) => store.getAll());
+  let learnedDatasetSigns = {};
+  try {
+    learnedDatasetSigns = JSON.parse(localStorage.getItem("learned-dataset-signs") || "{}");
+  } catch {
+    learnedDatasetSigns = {};
+  }
+  const builtInSigns = datasetSigns.map((sign) => ({
+    ...sign,
+    learned: Boolean(learnedDatasetSigns[sign.id]),
+  }));
+  return [...builtInSigns, ...savedSigns];
+}
+
 const saveSign = (sign) => storeRequest("readwrite", (store) => store.put(sign));
 const deleteSign = (id) => storeRequest("readwrite", (store) => store.delete(id));
 const getXp = () => Number(localStorage.getItem(XP_KEY) || 0);
@@ -69,12 +91,12 @@ function escapeHtml(value) {
 }
 
 function mediaMarkup(sign, className = "") {
-  const url = URL.createObjectURL(sign.blob);
+  const url = sign.source === "dataset" ? sign.mediaUrl : URL.createObjectURL(sign.blob);
   const label = sign.mediaType.startsWith("video/") ? "VIDÉO" : "PHOTO";
   const media = sign.mediaType.startsWith("video/")
     ? `<video class="${className}" src="${url}" muted playsinline preload="metadata" ${className.startsWith("practice-") ? "controls" : ""}></video>`
     : `<img class="${className}" src="${url}" alt="Référence pour le signe ${escapeHtml(sign.name)}" />`;
-  return { html: `${media}<span class="media-type">${label}</span>`, url };
+  return { html: `${media}<span class="media-type">${label}</span>`, url: sign.source === "dataset" ? null : url };
 }
 
 function signCard(sign) {
@@ -82,8 +104,8 @@ function signCard(sign) {
   return `<article class="sign-card">
     <div class="sign-thumb">${html}${sign.learned ? '<span class="learned-pill">✓ APPRIS</span>' : ""}</div>
     <div class="sign-card-body"><h3 class="sign-card-title">${escapeHtml(sign.name)}</h3>
-      <div class="sign-card-meta">${escapeHtml(sign.category || "À apprendre")} · ajouté ${new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short" }).format(sign.createdAt)}</div>
-      <div class="card-actions"><button class="card-action" data-practice="${sign.id}">${sign.learned ? "Réviser le signe →" : "Commencer →"}</button><button class="card-action delete" data-delete="${sign.id}" aria-label="Supprimer ${escapeHtml(sign.name)}">Supprimer</button></div>
+      <div class="sign-card-meta">${escapeHtml(sign.category || "À apprendre")}${sign.source === "dataset" ? ` · ${sign.videoCount} vidéo${sign.videoCount === 1 ? "" : "s"}` : " · vidéo personnelle"}</div>
+      <div class="card-actions"><button class="card-action" data-practice="${sign.id}">${sign.learned ? "Réviser le signe →" : "Commencer →"}</button>${sign.source === "dataset" ? "" : `<button class="card-action delete" data-delete="${sign.id}" aria-label="Supprimer ${escapeHtml(sign.name)}">Supprimer</button>`}</div>
     </div>
   </article>`;
 }
@@ -117,9 +139,14 @@ async function render() {
     : emptyState(signs.length ? "Bravo, tout est révisé !" : "Ta bibliothèque commence ici", signs.length ? "Ajoute d’autres signes pour continuer à pratiquer." : "Ajoute une photo ou une vidéo pour créer ton premier exercice.");
   const query = $("#search").value.trim().toLocaleLowerCase("fr");
   const filtered = signs.filter((sign) => `${sign.name} ${sign.category}`.toLocaleLowerCase("fr").includes(query));
-  $("#library-grid").innerHTML = filtered.length
-    ? filtered.map(signCard).join("")
-    : emptyState(query ? "Aucun résultat" : "Ta bibliothèque est encore vide", query ? "Essaie un autre nom de signe." : "Tes références apparaîtront ici après leur ajout.", !query);
+  const datasetEntries = filtered.filter((sign) => sign.source === "dataset");
+  const userEntries = filtered.filter((sign) => sign.source !== "dataset");
+  $("#dataset-signs-grid").innerHTML = datasetEntries.length
+    ? datasetEntries.map(signCard).join("")
+    : emptyState(query ? "Aucun signe de base trouvé" : "Le dataset n’est pas chargé", query ? "Essaie un autre nom." : "Lance le serveur intégré avec tes vidéos DTW locales.", false);
+  $("#user-signs-grid").innerHTML = userEntries.length
+    ? userEntries.map(signCard).join("")
+    : emptyState(query ? "Aucune vidéo personnelle trouvée" : "Aucune vidéo ajoutée", query ? "Essaie un autre nom." : "Ajoute une vidéo courte pour créer ta propre référence.");
   bindCardActions();
 }
 
@@ -128,6 +155,20 @@ function bindCardActions() {
   $$('[data-delete]').forEach((button) => button.addEventListener("click", async () => {
     const sign = (await getSigns()).find((entry) => entry.id === button.dataset.delete);
     if (!sign || !window.confirm(`Supprimer « ${sign.name} » de ta bibliothèque ?`)) return;
+    if (sign.referenceId) {
+      try {
+        const response = await fetch("/api/user-reference", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reference_id: sign.referenceId }),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Suppression de la référence impossible.");
+      } catch (error) {
+        showToast(error.message);
+        return;
+      }
+    }
     await deleteSign(sign.id);
     await render();
     showToast("Le signe a été supprimé.");
@@ -167,9 +208,35 @@ function openAddDialog() {
 async function startPractice(id) {
   const sign = (await getSigns()).find((entry) => entry.id === id);
   if (!sign) return;
+  if (
+    sign.source !== "dataset" &&
+    sign.mediaType.startsWith("video/") &&
+    !sign.referenceId
+  ) {
+    try {
+      const upload = new FormData();
+      upload.append("label", sign.name);
+      const extension = sign.mediaType.includes("webm") ? "webm" : sign.mediaType.includes("mp4") ? "mp4" : "mov";
+      upload.append("video", sign.blob, `previous-library-video.${extension}`);
+      const response = await fetch("/api/user-reference", { method: "POST", body: upload });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Impossible d’ajouter cette vidéo au reconnaisseur.");
+      sign.source = "user";
+      sign.referenceId = result.reference_id;
+      await saveSign(sign);
+    } catch (error) {
+      showToast(error.message);
+      return;
+    }
+  }
   stopCamera();
   if (referenceObjectUrl) URL.revokeObjectURL(referenceObjectUrl);
   currentPracticeId = id;
+  practiceHasResult = false;
+  practiceRewarded = false;
+  recognizerReady = false;
+  clearTimeout(healthPollTimer);
+  resetRecognitionControls();
   $("#practice-page-title").textContent = sign.name;
   $("#camera-error").textContent = "";
   const { html, url } = mediaMarkup(sign, "practice-reference-media");
@@ -180,6 +247,23 @@ async function startPractice(id) {
   if (video) video.muted = false;
   navigateToPage("pratique");
   enableCamera();
+  checkRecognizerStatus();
+}
+
+function resetRecognitionControls() {
+  const recordButton = $("#practice-record");
+  const finishButton = $("#practice-finish");
+  if (!recordButton || !finishButton) return;
+  recordButton.disabled = true;
+  recordButton.hidden = false;
+  recordButton.textContent = "Enregistrer mon essai";
+  finishButton.disabled = true;
+  finishButton.hidden = false;
+  finishButton.innerHTML = "Analyser mon essai <span>✓</span>";
+  $("#practice-guidance").textContent = "Enregistre ton essai, puis demande son analyse.";
+  $("#recognition-result").hidden = true;
+  $("#recognition-result").replaceChildren();
+  $("#recognizer-status").textContent = "Vérification du reconnaisseur local…";
 }
 
 async function openPracticePage() {
@@ -194,6 +278,9 @@ async function openPracticePage() {
 }
 
 function stopCamera() {
+  if (mediaRecorder?.state === "recording") mediaRecorder.stop();
+  mediaRecorder = null;
+  recordedChunks = [];
   if (cameraStream) cameraStream.getTracks().forEach((track) => track.stop());
   cameraStream = null;
   const feed = $("#webcam-feed");
@@ -206,9 +293,11 @@ function stopCamera() {
   $("#camera-stop").hidden = true;
   $("#camera-status").classList.remove("active");
   $("#camera-status").lastChild.textContent = " Caméra désactivée";
+  $("#practice-record").disabled = true;
 }
 
 function clearPractice() {
+  clearTimeout(healthPollTimer);
   stopCamera();
   if (referenceObjectUrl) URL.revokeObjectURL(referenceObjectUrl);
   referenceObjectUrl = null;
@@ -229,11 +318,13 @@ async function enableCamera() {
     feed.hidden = false;
     $("#camera-placeholder").hidden = true;
     $("#live-badge").hidden = false;
+    $("#live-badge").textContent = "EN DIRECT";
     $("#camera-start").hidden = true;
     $("#camera-stop").hidden = false;
     $("#camera-status").classList.add("active");
     $("#camera-status").lastChild.textContent = " Caméra active";
     await feed.play();
+    $("#practice-record").disabled = !recognizerReady;
   } catch (error) {
     stopCamera();
     const messages = {
@@ -245,29 +336,177 @@ async function enableCamera() {
   }
 }
 
+async function checkRecognizerStatus() {
+  clearTimeout(healthPollTimer);
+  try {
+    const response = await fetch("/api/health", { cache: "no-store" });
+    const status = await response.json();
+    if (status.status === "ready") {
+      recognizerReady = true;
+      $("#recognizer-status").textContent = "Reconnaisseur prêt.";
+      $("#practice-record").disabled = !cameraStream;
+      return;
+    }
+    if (status.status === "error") {
+      recognizerReady = false;
+      $("#practice-record").disabled = true;
+      $("#recognizer-status").textContent = `Reconnaisseur indisponible : ${status.error}`;
+      return;
+    }
+    $("#recognizer-status").textContent = "Préparation des références de signes… cela peut prendre un peu de temps au premier lancement.";
+  } catch {
+    recognizerReady = false;
+    $("#practice-record").disabled = true;
+    $("#recognizer-status").textContent = "Serveur local indisponible. Lance platform/server.py depuis l’environnement Python du projet.";
+  }
+  healthPollTimer = setTimeout(checkRecognizerStatus, 2500);
+}
+
 async function finishPractice() {
-  const signs = await getSigns();
-  const sign = signs.find((entry) => entry.id === currentPracticeId);
-  if (!sign) return;
-  const wasLearned = sign?.learned;
-  if (sign && !sign.learned) {
-    sign.learned = true;
-    await saveSign(sign);
-    setXp(getXp() + 10);
+  if (practiceHasResult && mediaRecorder?.state !== "recording") {
+    clearPractice();
+    await render();
+    navigateToPage("bibliotheque");
+    return;
   }
-  const daily = recordDailyPractice();
-  const encouragements = wasLearned
-    ? ["Bien révisé ! La répétition aide à mémoriser.", "Une pratique de plus, bravo !", "Tu avances à ton rythme, et ça compte."]
-    : ["Bien joué, +10 XP !", "Un signe de plus dans ta boîte à outils !", "Premier passage validé, bravo !"];
-  if (daily.before < 3 && daily.count === 3) {
-    showToast("Défi du jour accompli ! Bravo 🎉");
-    celebrateChallenge();
-  } else {
-    showToast(encouragements[Math.floor(Math.random() * encouragements.length)]);
+  if (!mediaRecorder || mediaRecorder.state !== "recording") return;
+  const finishButton = $("#practice-finish");
+  const recordButton = $("#practice-record");
+  finishButton.disabled = true;
+  recordButton.disabled = true;
+  $("#practice-guidance").textContent = "Analyse en cours…";
+  $("#camera-error").textContent = "";
+  const recorder = mediaRecorder;
+  const clip = await new Promise((resolve, reject) => {
+    recorder.addEventListener("error", () => reject(new Error("L’enregistrement a échoué.")), { once: true });
+    recorder.addEventListener("stop", () => resolve(new Blob(recordedChunks, { type: recorder.mimeType || "video/webm" })), { once: true });
+    recorder.stop();
+  }).catch((error) => {
+    $("#camera-error").textContent = error.message;
+    finishButton.disabled = false;
+    recordButton.disabled = false;
+    return null;
+  });
+  mediaRecorder = null;
+  const durationSeconds = recordingStartedAt === null ? null : (performance.now() - recordingStartedAt) / 1000;
+  recordingStartedAt = null;
+  recordedChunks = [];
+  if (!clip || !clip.size) {
+    $("#camera-error").textContent = "La vidéo est vide. Enregistre un essai un peu plus long.";
+    $("#practice-guidance").textContent = "Réessaie avec un nouvel enregistrement.";
+    recordButton.disabled = false;
+    return;
   }
-  clearPractice();
-  await render();
-  navigateToPage("bibliotheque");
+
+  try {
+    const formData = new FormData();
+    const extension = clip.type.includes("mp4") ? "mp4" : "webm";
+    formData.append("video", clip, `practice.${extension}`);
+    if (durationSeconds !== null) formData.append("duration_seconds", String(durationSeconds));
+    const currentSigns = await getSigns();
+    const expectedSign = currentSigns.find((entry) => entry.id === currentPracticeId);
+    if (!expectedSign) throw new Error("Le signe à pratiquer n’a pas été retrouvé.");
+    formData.append("expected", expectedSign.name);
+    const response = await fetch("/api/recognize", { method: "POST", body: formData });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Le serveur n’a pas pu analyser cette vidéo.");
+    showRecognitionResult(result);
+    practiceHasResult = true;
+    const signs = await getSigns();
+    const sign = signs.find((entry) => entry.id === currentPracticeId);
+    const wasLearned = sign?.learned;
+    if (sign && result.matches_expected && !practiceRewarded) {
+      if (!sign.learned && sign.source === "dataset") {
+        let learnedLabels = {};
+        try {
+          learnedLabels = JSON.parse(localStorage.getItem("learned-dataset-signs") || "{}");
+        } catch {
+          learnedLabels = {};
+        }
+        learnedLabels[sign.id] = true;
+        localStorage.setItem("learned-dataset-signs", JSON.stringify(learnedLabels));
+      } else if (!sign.learned) {
+        sign.learned = true;
+        await saveSign(sign);
+      }
+      if (!wasLearned) {
+        setXp(getXp() + 10);
+      }
+      practiceRewarded = true;
+      showToast(wasLearned ? "Signe reconnu, bien joué !" : "Signe reconnu, +10 XP !");
+    }
+    const daily = recordDailyPractice();
+    if (daily.before < 3 && daily.count === 3) celebrateChallenge();
+    finishButton.disabled = false;
+    finishButton.innerHTML = "Terminer <span>✓</span>";
+    recordButton.disabled = false;
+    recordButton.textContent = "Réessayer";
+    $("#practice-guidance").textContent = result.matches_expected
+      ? "Le signe de référence a été reconnu. Tu peux réessayer ou terminer."
+      : "Regarde le résultat, puis réessaie si tu le souhaites.";
+    await render();
+  } catch (error) {
+    $("#camera-error").textContent = error.message;
+    practiceHasResult = true;
+    finishButton.disabled = false;
+    finishButton.innerHTML = "Terminer <span>✓</span>";
+    $("#practice-guidance").textContent = "L’analyse n’a pas abouti. Vérifie que le serveur Learn LSF est lancé, puis réessaie.";
+    recordButton.disabled = false;
+    recordButton.textContent = "Réessayer";
+  }
+}
+
+function showRecognitionResult(result) {
+  const host = $("#recognition-result");
+  host.replaceChildren();
+  const title = document.createElement("strong");
+  title.textContent = !result.expected_available
+    ? `« ${result.expected} » n’est pas dans les signes de référence du reconnaisseur.`
+    : result.matches_expected
+      ? `Bien joué ! « ${result.prediction} » a été reconnu.`
+      : result.prediction === "Signe inconnu"
+        ? "Le signe n’a pas pu être reconnu cette fois."
+        : `Le signe détecté est « ${result.prediction} ».`;
+  host.append(title);
+  if (!result.matches_expected && result.expected_available && result.prediction !== "Signe inconnu") {
+    const detail = document.createElement("span");
+    detail.textContent = ` La référence attendue était « ${result.expected} ». Tu peux réessayer.`;
+    host.append(detail);
+  }
+  host.hidden = false;
+}
+
+function startPracticeRecording() {
+  if (!cameraStream) {
+    $("#camera-error").textContent = "Active d’abord la caméra.";
+    return;
+  }
+  if (!window.MediaRecorder) {
+    $("#camera-error").textContent = "Ce navigateur ne permet pas d’enregistrer la vidéo pour l’analyse.";
+    return;
+  }
+  const mimeType = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm", "video/mp4"]
+    .find((type) => MediaRecorder.isTypeSupported(type));
+  try {
+    practiceHasResult = false;
+    mediaRecorder = new MediaRecorder(cameraStream, mimeType ? { mimeType } : undefined);
+    recordedChunks = [];
+    mediaRecorder.addEventListener("dataavailable", (event) => {
+      if (event.data.size) recordedChunks.push(event.data);
+    });
+    mediaRecorder.start(250);
+    recordingStartedAt = performance.now();
+    $("#practice-record").disabled = true;
+    $("#practice-record").textContent = "Enregistrement…";
+    $("#practice-finish").disabled = false;
+    $("#practice-finish").innerHTML = "Arrêter et analyser <span>✓</span>";
+    $("#practice-guidance").textContent = "Fais le signe face à la caméra, puis arrête l’enregistrement.";
+    $("#recognition-result").hidden = true;
+    $("#camera-error").textContent = "";
+    $("#live-badge").textContent = "ENREGISTREMENT";
+  } catch (error) {
+    $("#camera-error").textContent = `Impossible de démarrer l’enregistrement : ${error.message}`;
+  }
 }
 
 function navigateToPage(page) {
@@ -298,8 +537,24 @@ $("#add-form").addEventListener("submit", async (event) => {
     $("#form-error").textContent = "Le fichier dépasse la limite de 100 Mo.";
     return;
   }
+  let uploadedReferenceId = null;
+  const submitButton = form.querySelector('button[type="submit"]');
+  const originalSubmitText = submitButton.innerHTML;
+  submitButton.disabled = true;
+  submitButton.textContent = file.type.startsWith("video/") ? "Ajout et analyse…" : "Enregistrement…";
   try {
-    await saveSign({ id: crypto.randomUUID(), name, category: $("#sign-category").value, blob: file, mediaType: file.type, createdAt: Date.now(), learned: false });
+    let referenceId = null;
+    if (file.type.startsWith("video/")) {
+      const upload = new FormData();
+      upload.append("label", name);
+      upload.append("video", file, file.name);
+      const response = await fetch("/api/user-reference", { method: "POST", body: upload });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Impossible d’ajouter cette vidéo au reconnaisseur.");
+      referenceId = result.reference_id;
+      uploadedReferenceId = referenceId;
+    }
+    await saveSign({ id: crypto.randomUUID(), name, category: $("#sign-category").value, blob: file, mediaType: file.type, createdAt: Date.now(), learned: false, source: "user", referenceId });
     $("#add-dialog").close();
     form.reset();
     $("#upload-title").textContent = "Choisir un fichier";
@@ -307,7 +562,17 @@ $("#add-form").addEventListener("submit", async (event) => {
     await render();
     showToast("Ton signe a été ajouté à la bibliothèque.");
   } catch (error) {
-    $("#form-error").textContent = "Le navigateur n’a pas pu enregistrer ce fichier. Essaie un fichier plus léger.";
+    if (uploadedReferenceId) {
+      fetch("/api/user-reference", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reference_id: uploadedReferenceId }),
+      }).catch(() => {});
+    }
+    $("#form-error").textContent = error.message || "Le navigateur n’a pas pu enregistrer ce fichier. Essaie un fichier plus léger.";
+  } finally {
+    submitButton.disabled = false;
+    submitButton.innerHTML = originalSubmitText;
   }
 });
 
@@ -318,6 +583,17 @@ $("#sign-file").addEventListener("change", (event) => {
   $("#upload-caption").textContent = `${file.type.startsWith("video/") ? "Vidéo" : "Image"} · ${(file.size / (1024 * 1024)).toFixed(1)} Mo`;
   $("#form-error").textContent = "";
 });
+
+async function loadDatasetSigns() {
+  try {
+    const response = await fetch("/api/signs", { cache: "no-store" });
+    if (!response.ok) return;
+    const payload = await response.json();
+    datasetSigns = payload.signs || [];
+  } catch {
+    datasetSigns = [];
+  }
+}
 
 $("#search").addEventListener("input", render);
 $("#add-open").addEventListener("click", openAddDialog);
@@ -338,6 +614,7 @@ $("#daily-start").addEventListener("click", async () => {
 
 $("#camera-start").addEventListener("click", enableCamera);
 $("#camera-stop").addEventListener("click", stopCamera);
+$("#practice-record").addEventListener("click", startPracticeRecording);
 $("#practice-finish").addEventListener("click", finishPractice);
 $("#practice-back").addEventListener("click", () => navigateToPage("bibliotheque"));
 
@@ -357,6 +634,7 @@ window.addEventListener("unhandledrejection", (event) => {
 
 openDatabase().then(async (db) => {
   database = db;
+  await loadDatasetSigns();
   await render();
 }).catch((error) => {
   console.error("Learn LSF could not initialize:", error);

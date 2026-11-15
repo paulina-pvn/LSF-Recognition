@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#f6f5f0" />
     <title>Learn LSF — apprendre la LSF</title>
     <link rel="stylesheet" href="styles.css?v=3" />
-    <link rel="stylesheet" href="calm.css?v=3" />
+    <link rel="stylesheet" href="calm.css?v=5" />
   </head>
   <body>
     <div class="app-shell">
@@ -73,7 +73,14 @@
             <button class="button button-primary" id="add-open-library"><span class="plus">＋</span> Ajouter un signe</button>
           </div>
           <div class="library-toolbar"><div class="library-count"><strong id="library-total">0 signe</strong><span>· tes médias restent sur cet appareil</span></div><label class="search-box"><span>⌕</span><input id="search" type="search" placeholder="Rechercher un signe…" aria-label="Rechercher un signe" /></label></div>
-          <div class="library-grid" id="library-grid"></div>
+          <section class="library-group">
+            <div class="library-group-heading"><h2>Signes de base</h2><span>Références du projet DTW</span></div>
+            <div class="library-grid" id="dataset-signs-grid"></div>
+          </section>
+          <section class="library-group">
+            <div class="library-group-heading"><h2>Mes vidéos</h2><span>Références que tu as ajoutées</span></div>
+            <div class="library-grid" id="user-signs-grid"></div>
+          </section>
         </section>
 
         <section class="page" id="page-pratique">
@@ -95,10 +102,12 @@
                 <video id="webcam-feed" autoplay playsinline muted hidden></video>
                 <span class="live-badge" id="live-badge" hidden><i></i> EN DIRECT</span>
               </div>
-              <div class="camera-controls"><button class="button button-primary" id="camera-start">Activer ma caméra</button><button class="button button-soft" id="camera-stop" hidden>Éteindre la caméra</button><span class="camera-note">Aucune image n’est enregistrée.</span></div>
+              <div class="camera-controls"><button class="button button-primary" id="camera-start">Activer ma caméra</button><button class="button button-soft" id="camera-stop" hidden>Éteindre la caméra</button><button class="button button-soft" id="practice-record" disabled>Enregistrer mon essai</button><span class="camera-note">L’essai est envoyé au serveur local pour analyse, puis supprimé.</span></div>
             </article>
           </div>
-          <div class="practice-page-actions"><p>Prends ton temps. Quand tu as fini, valide ta pratique.</p><button class="button button-primary" id="practice-finish">J’ai terminé <span>✓</span></button></div>
+          <div class="practice-page-actions"><p id="practice-guidance">Enregistre ton essai, puis demande son analyse.</p><button class="button button-primary" id="practice-finish" disabled>Analyser mon essai <span>✓</span></button></div>
+          <div class="recognition-result" id="recognition-result" role="status" aria-live="polite" hidden></div>
+          <p class="recognizer-status" id="recognizer-status" role="status" aria-live="polite"></p>
           <p class="camera-error" id="camera-error" role="status" aria-live="polite"></p>
         </section>
 
@@ -114,6 +123,7 @@
         <label class="field-label" for="sign-category">Thème <span class="optional">(facultatif)</span></label><select class="text-input" id="sign-category" name="category"><option>Salutations</option><option>Vie quotidienne</option><option>Émotions</option><option>À apprendre</option><option>Autre</option></select>
         <label class="field-label">Photo ou vidéo de référence</label>
         <label class="upload-zone" for="sign-file"><span class="upload-icon">↑</span><strong id="upload-title">Choisir un fichier</strong><span id="upload-caption">Image ou vidéo · 100 Mo max</span><input id="sign-file" name="media" type="file" accept="image/*,video/*" required /></label>
+        <p class="upload-help">Les vidéos courtes contenant un seul signe sont ajoutées localement aux références du reconnaisseur. Une photo sert de modèle visuel, mais ne peut pas être comparée par le DTW.</p>
         <div class="form-error" id="form-error" role="alert"></div>
         <button class="button button-primary button-wide" type="submit">Ajouter à ma bibliothèque <span>→</span></button>
         <p class="privacy-note">🔒 Tes fichiers restent enregistrés dans ce navigateur.</p>
@@ -121,6 +131,6 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app.js?v=4"></script>
+    <script src="app.js?v=6"></script>
   </body>
 </html>
