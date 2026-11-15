@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#f6f5f0" />
     <title>Learn LSF — apprendre la LSF</title>
     <link rel="stylesheet" href="styles.css?v=3" />
-    <link rel="stylesheet" href="calm.css?v=5" />
+    <link rel="stylesheet" href="calm.css?v=6" />
   </head>
   <body>
     <div class="app-shell">
@@ -47,7 +47,7 @@
           <div class="stats-grid">
             <article class="stat-card stat-violet"><div class="stat-top"><span class="stat-icon">▤</span><span class="stat-caption">DANS TA BIBLIOTHÈQUE</span></div><div class="stat-value" id="stat-total">0</div><div class="stat-foot">signe<span id="plural-total">s</span> de référence</div></article>
             <article class="stat-card stat-peach"><div class="stat-top"><span class="stat-icon">✓</span><span class="stat-caption">DÉJÀ APPRIS</span></div><div class="stat-value" id="stat-learned">0</div><div class="stat-foot">à ton propre rythme</div></article>
-            <article class="stat-card stat-green"><div class="stat-top"><span class="stat-icon">＋</span><span class="stat-caption">TES POINTS</span></div><div class="stat-value"><span id="stat-points">0</span><small> XP</small></div><div class="stat-foot">+10 XP par signe révisé</div></article>
+            <article class="stat-card stat-green"><div class="stat-top"><span class="stat-icon">＋</span><span class="stat-caption">TES POINTS</span></div><div class="stat-value"><span id="stat-points">0</span><small> XP</small></div><div class="stat-foot">+10 XP par nouveau signe réussi</div></article>
           </div>
 
           <section class="content-section practice-section">
@@ -107,6 +107,11 @@
           </div>
           <div class="practice-page-actions"><p id="practice-guidance">Enregistre ton essai, puis demande son analyse.</p><button class="button button-primary" id="practice-finish" disabled>Analyser mon essai <span>✓</span></button></div>
           <div class="recognition-result" id="recognition-result" role="status" aria-live="polite" hidden></div>
+          <div class="practice-rating" id="practice-rating" hidden>
+            <p>Comment s’est passée ta pratique ?</p>
+            <button class="button rating-failed" id="rate-failed" type="button">Raté · à revoir bientôt</button>
+            <button class="button rating-success" id="rate-success" type="button">Réussi · revoir plus tard</button>
+          </div>
           <p class="recognizer-status" id="recognizer-status" role="status" aria-live="polite"></p>
           <p class="camera-error" id="camera-error" role="status" aria-live="polite"></p>
         </section>
@@ -131,6 +136,6 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app.js?v=6"></script>
+    <script src="app.js?v=9"></script>
   </body>
 </html>

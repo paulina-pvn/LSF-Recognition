@@ -18,14 +18,15 @@ Puis ouvrir <http://localhost:8000> dans le navigateur. Pour arrêter le serveur
 - Ajout d’une référence (photo ou vidéo, jusqu’à 100 Mo) avec son nom et son thème.
 - Bibliothèque consultable, filtrable et modifiable (suppression).
 - Page de pratique en deux panneaux : regarder la référence et se voir avec la webcam en même temps.
-- Progression locale : un signe marqué comme appris rapporte 10 XP.
+- Progression locale : un signe noté **Réussi** rapporte 10 XP la première fois.
+- Révision espacée : **Réussi** repropose le signe après 15 pratiques classées ; **Raté** le repropose après 2 autres pratiques.
 - Petit défi quotidien de trois pratiques, avec choix aléatoire d’un signe et animation de réussite.
 - Page de pratique avec lecture de la référence et aperçu webcam côte à côte.
 - Fichiers et progression enregistrés dans le navigateur de l’utilisateur avec IndexedDB et `localStorage`.
 
 ## Limites actuelles
 
-- Les médias de bibliothèque et la progression restent dans le navigateur et sur l’appareil courant ; il n’y a ni compte ni synchronisation en ligne.
+- Les médias de bibliothèque, le statut des signes et le calendrier de révision restent dans le navigateur et sur l’appareil courant ; il n’y a ni compte ni synchronisation en ligne.
 - Le mode statique ci-dessus n’active que l’aperçu caméra et les médias déjà enregistrés dans le navigateur. Pour utiliser les signes DTW et la reconnaissance, lance le serveur intégré indiqué ci-dessous.
 
 En ouvrant **Pratiquer** (ou **Commencer** depuis une carte), le site charge le premier signe non appris et demande l’autorisation de la webcam. La caméra fonctionne sur `localhost` ou sur un site servi en HTTPS.
@@ -49,4 +50,4 @@ python ../platform/server.py
 
 Ouvre ensuite <http://localhost:8000>. Au démarrage, le serveur charge les vidéos et les caches DTW. La toute première préparation peut prendre du temps si les caches de `data/dataset_tasks/` ne sont pas encore créés. Garde les vidéos locales dans `Sign-Language-Recognition--MediaPipe-DTW/data/videos/` et le modèle `models/hand_landmarker.task` présent. Les médias de référence et ce modèle sont ignorés par Git ; il faut donc les télécharger/importer sur un autre ordinateur aussi.
 
-Dans la page **Pratiquer** : active la caméra, clique **Enregistrer mon essai**, fais le signe, puis clique **Arrêter et analyser**. La reconnaissance compare avec les vidéos du dataset DTW et les vidéos personnelles importées. Le signe est marqué appris si la prédiction correspond au signe pratiqué. Le site peut afficher **Signe inconnu** ou une prédiction incorrecte ; les résultats dépendent de la qualité et du nombre de références.
+Dans la page **Pratiquer** : active la caméra, clique **Enregistrer mon essai**, fais le signe, puis clique **Arrêter et analyser**. La reconnaissance compare avec les vidéos du dataset DTW et les vidéos personnelles importées. Elle compare les coûts DTW normalisés et combine les meilleures références de chaque signe, ce qui réduit l’avantage des classes qui ont plus de vidéos. Le signe est marqué appris si la prédiction correspond au signe pratiqué. Le site peut encore se tromper : le modèle ne compare que la forme et le mouvement des mains, pas leur position par rapport au visage ou au corps.

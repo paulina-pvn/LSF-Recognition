@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 import math
 import random
-import re
 import sys
 import tempfile
 import threading
@@ -50,10 +49,6 @@ def load_recogniser() -> None:
         references = load_reference_signs(videos)
         if references.empty:
             raise RuntimeError("Le jeu de références ne contient aucun signe.")
-        references["source"] = [
-            "user" if Path(video).parts[0] == "user_uploads" else "dataset"
-            for video in videos
-        ]
         recogniser_state["reference_signs"] = references
         recogniser_state["status"] = "ready"
     except Exception as error:  # Report setup errors through /api/health.
@@ -170,7 +165,7 @@ def sample_video_frames(
 
 def recognize_video(video_path: str, expected: str, duration_hint: float | None) -> dict:
     from models.sign_model import SignModel
-    from utils.dtw import dtw_distances
+    from utils.dtw import dtw_distances, rank_sign_classes
     from utils.landmark_utils import extract_landmarks
     from utils.mediapipe_utils import create_hand_landmarker, mediapipe_detection
 
@@ -187,8 +182,8 @@ def recognize_video(video_path: str, expected: str, duration_hint: float | None)
     references = recogniser_state["reference_signs"].copy(deep=True)
     known_labels = {normalize_label(str(name)) for name in references["name"].unique()}
     distances = dtw_distances(recorded_sign, references)
-    finite = distances[np.isfinite(distances["distance"].astype(float))].head(5)
-    if finite.empty:
+    class_scores = rank_sign_classes(distances)
+    if not class_scores:
         return {
             "prediction": "Signe inconnu",
             "expected": expected,
@@ -197,12 +192,7 @@ def recognize_video(video_path: str, expected: str, duration_hint: float | None)
             "top_matches": [],
         }
 
-    votes = finite["name"].value_counts()
-    nearest = finite.iloc[0]
-    if nearest.get("source") == "user":
-        prediction = str(nearest["name"])
-    else:
-        prediction = str(votes.index[0]) if int(votes.iloc[0]) >= 2 else "Signe inconnu"
+    prediction = class_scores[0][0]
     return {
         "prediction": prediction,
         "expected": expected,
@@ -212,8 +202,8 @@ def recognize_video(video_path: str, expected: str, duration_hint: float | None)
             and normalize_label(prediction) == normalize_label(expected)
         ),
         "top_matches": [
-            {"name": str(row["name"]), "distance": float(row["distance"])}
-            for _, row in finite.iterrows()
+            {"name": name, "distance": score}
+            for name, score in class_scores[:5]
         ],
     }
 
@@ -223,10 +213,6 @@ def refresh_reference_signs() -> None:
 
     videos = load_dataset()
     references = load_reference_signs(videos)
-    references["source"] = [
-        "user" if Path(video).parts[0] == "user_uploads" else "dataset"
-        for video in videos
-    ]
     recogniser_state["reference_signs"] = references
     recogniser_state["status"] = "ready"
 

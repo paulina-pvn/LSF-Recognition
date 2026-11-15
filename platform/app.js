@@ -3,6 +3,7 @@ const DB_VERSION = 1;
 const STORE_NAME = "signs";
 const XP_KEY = "signe-learning-xp";
 const DAILY_KEY = "signe-learning-daily";
+const SCHEDULE_KEY = "signe-learning-schedule";
 let database;
 let datasetSigns = [];
 let currentPracticeId = null;
@@ -11,7 +12,6 @@ let mediaRecorder = null;
 let recordedChunks = [];
 let recordingStartedAt = null;
 let practiceHasResult = false;
-let practiceRewarded = false;
 let recognizerReady = false;
 let healthPollTimer = null;
 let referenceObjectUrl = null;
@@ -61,6 +61,19 @@ const saveSign = (sign) => storeRequest("readwrite", (store) => store.put(sign))
 const deleteSign = (id) => storeRequest("readwrite", (store) => store.delete(id));
 const getXp = () => Number(localStorage.getItem(XP_KEY) || 0);
 const setXp = (value) => localStorage.setItem(XP_KEY, String(value));
+
+function getPracticeSchedule() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SCHEDULE_KEY) || "null");
+    if (saved && Number.isFinite(saved.sequence) && saved.signs) return saved;
+  } catch {
+    // Start a fresh review schedule if saved progress is unreadable.
+  }
+  return { sequence: 0, signs: {} };
+}
+
+const savePracticeSchedule = (schedule) =>
+  localStorage.setItem(SCHEDULE_KEY, JSON.stringify(schedule));
 
 function localDateKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -233,7 +246,6 @@ async function startPractice(id) {
   if (referenceObjectUrl) URL.revokeObjectURL(referenceObjectUrl);
   currentPracticeId = id;
   practiceHasResult = false;
-  practiceRewarded = false;
   recognizerReady = false;
   clearTimeout(healthPollTimer);
   resetRecognitionControls();
@@ -263,6 +275,9 @@ function resetRecognitionControls() {
   $("#practice-guidance").textContent = "Enregistre ton essai, puis demande son analyse.";
   $("#recognition-result").hidden = true;
   $("#recognition-result").replaceChildren();
+  $("#practice-rating").hidden = true;
+  $("#rate-success").disabled = false;
+  $("#rate-failed").disabled = false;
   $("#recognizer-status").textContent = "Vérification du reconnaisseur local…";
 }
 
@@ -273,7 +288,12 @@ async function openPracticePage() {
     showToast("Ajoute d’abord une photo ou une vidéo de référence pour pratiquer.");
     return;
   }
-  const sign = signs.find((entry) => !entry.learned) || signs[0];
+  const sign = chooseNextSign(signs, null, getPracticeSchedule());
+  if (!sign) {
+    navigateToPage("bibliotheque");
+    showToast("Tout est révisé pour le moment. Ajoute un signe ou reviens un peu plus tard.");
+    return;
+  }
   startPractice(sign.id);
 }
 
@@ -363,12 +383,6 @@ async function checkRecognizerStatus() {
 }
 
 async function finishPractice() {
-  if (practiceHasResult && mediaRecorder?.state !== "recording") {
-    clearPractice();
-    await render();
-    navigateToPage("bibliotheque");
-    return;
-  }
   if (!mediaRecorder || mediaRecorder.state !== "recording") return;
   const finishButton = $("#practice-finish");
   const recordButton = $("#practice-record");
@@ -412,48 +426,81 @@ async function finishPractice() {
     if (!response.ok) throw new Error(result.error || "Le serveur n’a pas pu analyser cette vidéo.");
     showRecognitionResult(result);
     practiceHasResult = true;
-    const signs = await getSigns();
-    const sign = signs.find((entry) => entry.id === currentPracticeId);
-    const wasLearned = sign?.learned;
-    if (sign && result.matches_expected && !practiceRewarded) {
-      if (!sign.learned && sign.source === "dataset") {
-        let learnedLabels = {};
-        try {
-          learnedLabels = JSON.parse(localStorage.getItem("learned-dataset-signs") || "{}");
-        } catch {
-          learnedLabels = {};
-        }
-        learnedLabels[sign.id] = true;
-        localStorage.setItem("learned-dataset-signs", JSON.stringify(learnedLabels));
-      } else if (!sign.learned) {
-        sign.learned = true;
-        await saveSign(sign);
-      }
-      if (!wasLearned) {
-        setXp(getXp() + 10);
-      }
-      practiceRewarded = true;
-      showToast(wasLearned ? "Signe reconnu, bien joué !" : "Signe reconnu, +10 XP !");
-    }
-    const daily = recordDailyPractice();
-    if (daily.before < 3 && daily.count === 3) celebrateChallenge();
-    finishButton.disabled = false;
-    finishButton.innerHTML = "Terminer <span>✓</span>";
+    finishButton.hidden = true;
+    $("#practice-rating").hidden = false;
     recordButton.disabled = false;
     recordButton.textContent = "Réessayer";
-    $("#practice-guidance").textContent = result.matches_expected
-      ? "Le signe de référence a été reconnu. Tu peux réessayer ou terminer."
-      : "Regarde le résultat, puis réessaie si tu le souhaites.";
+    $("#practice-guidance").textContent = "Évalue ton essai pour choisir quand revoir ce signe.";
     await render();
   } catch (error) {
     $("#camera-error").textContent = error.message;
     practiceHasResult = true;
-    finishButton.disabled = false;
-    finishButton.innerHTML = "Terminer <span>✓</span>";
-    $("#practice-guidance").textContent = "L’analyse n’a pas abouti. Vérifie que le serveur Learn LSF est lancé, puis réessaie.";
+    finishButton.hidden = true;
+    $("#practice-rating").hidden = false;
+    $("#practice-guidance").textContent = "L’analyse n’a pas abouti, mais tu peux quand même évaluer ton essai.";
     recordButton.disabled = false;
     recordButton.textContent = "Réessayer";
   }
+}
+
+async function ratePractice(successful) {
+  if (!practiceHasResult || !currentPracticeId) return;
+  $("#rate-success").disabled = true;
+  $("#rate-failed").disabled = true;
+  const signs = await getSigns();
+  const sign = signs.find((entry) => entry.id === currentPracticeId);
+  if (!sign) return;
+
+  const wasLearned = Boolean(sign.learned);
+  const schedule = getPracticeSchedule();
+  schedule.sequence += 1;
+  schedule.signs[sign.id] = {
+    result: successful ? "success" : "failed",
+    dueAt: schedule.sequence + (successful ? 15 : 2),
+  };
+
+  if (sign.source === "dataset") {
+    let learnedLabels = {};
+    try {
+      learnedLabels = JSON.parse(localStorage.getItem("learned-dataset-signs") || "{}");
+    } catch {
+      learnedLabels = {};
+    }
+    if (successful) learnedLabels[sign.id] = true;
+    else delete learnedLabels[sign.id];
+    localStorage.setItem("learned-dataset-signs", JSON.stringify(learnedLabels));
+  } else {
+    sign.learned = successful;
+    await saveSign(sign);
+  }
+  if (successful && !wasLearned) setXp(getXp() + 10);
+  savePracticeSchedule(schedule);
+
+  const daily = recordDailyPractice();
+  if (daily.before < 3 && daily.count === 3) celebrateChallenge();
+
+  const nextSign = chooseNextSign(signs, sign.id, schedule);
+  await render();
+  if (nextSign) {
+    showToast(successful ? "Bien joué ! Ce signe reviendra plus tard." : "Pas grave, ce signe reviendra bientôt.");
+    await startPractice(nextSign.id);
+  } else {
+    clearPractice();
+    navigateToPage("bibliotheque");
+    showToast("Aucun autre signe n’est à revoir pour le moment.");
+  }
+}
+
+function chooseNextSign(signs, currentId, schedule) {
+  const alternatives = signs.filter((sign) => sign.id !== currentId);
+  if (!alternatives.length) return null;
+
+  const due = alternatives.filter((sign) => {
+    const review = schedule.signs[sign.id];
+    return !review || review.dueAt <= schedule.sequence;
+  });
+  if (due.length) return due[Math.floor(Math.random() * due.length)];
+  return null;
 }
 
 function showRecognitionResult(result) {
@@ -472,6 +519,11 @@ function showRecognitionResult(result) {
     const detail = document.createElement("span");
     detail.textContent = ` La référence attendue était « ${result.expected} ». Tu peux réessayer.`;
     host.append(detail);
+  }
+  if (!result.matches_expected && result.top_matches?.length > 1) {
+    const alternatives = document.createElement("p");
+    alternatives.textContent = `Autres signes proches : ${result.top_matches.slice(1, 4).map((match) => match.name).join(", ")}.`;
+    host.append(alternatives);
   }
   host.hidden = false;
 }
@@ -499,9 +551,11 @@ function startPracticeRecording() {
     $("#practice-record").disabled = true;
     $("#practice-record").textContent = "Enregistrement…";
     $("#practice-finish").disabled = false;
+    $("#practice-finish").hidden = false;
     $("#practice-finish").innerHTML = "Arrêter et analyser <span>✓</span>";
     $("#practice-guidance").textContent = "Fais le signe face à la caméra, puis arrête l’enregistrement.";
     $("#recognition-result").hidden = true;
+    $("#practice-rating").hidden = true;
     $("#camera-error").textContent = "";
     $("#live-badge").textContent = "ENREGISTREMENT";
   } catch (error) {
@@ -605,9 +659,15 @@ $("#daily-start").addEventListener("click", async () => {
     showToast("Ajoute un signe pour commencer ton défi !");
     return;
   }
+  const schedule = getPracticeSchedule();
   const lastId = localStorage.getItem("signe-learning-last-challenge");
-  const choices = signs.length > 1 ? signs.filter((sign) => sign.id !== lastId) : signs;
+  let choices = signs.filter((sign) => sign.id !== lastId && (!schedule.signs[sign.id] || schedule.signs[sign.id].dueAt <= schedule.sequence));
+  if (!choices.length) choices = signs.filter((sign) => !schedule.signs[sign.id] || schedule.signs[sign.id].dueAt <= schedule.sequence);
   const chosen = choices[Math.floor(Math.random() * choices.length)];
+  if (!chosen) {
+    showToast("Aucun signe n’est à revoir pour le moment.");
+    return;
+  }
   localStorage.setItem("signe-learning-last-challenge", chosen.id);
   startPractice(chosen.id);
 });
@@ -616,6 +676,8 @@ $("#camera-start").addEventListener("click", enableCamera);
 $("#camera-stop").addEventListener("click", stopCamera);
 $("#practice-record").addEventListener("click", startPracticeRecording);
 $("#practice-finish").addEventListener("click", finishPractice);
+$("#rate-success").addEventListener("click", () => ratePractice(true));
+$("#rate-failed").addEventListener("click", () => ratePractice(false));
 $("#practice-back").addEventListener("click", () => navigateToPage("bibliotheque"));
 
 $$('[data-page]').forEach((button) => button.addEventListener("click", () => {
