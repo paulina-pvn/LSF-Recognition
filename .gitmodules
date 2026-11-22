@@ -7,3 +7,6 @@
 [submodule "Medisign-Assist"]
 	path = Medisign-Assist
 	url = https://github.com/paulina-pvn/medisign-assist
+[submodule "Sign-Language-Recognition-using-VIT-and-GAT"]
+	path = Sign-Language-Recognition-using-VIT-and-GAT
+	url = https://github.com/Anusha-Sundar-2912/Sign-Language-Recognition-using-VIT-and-GAT.git
