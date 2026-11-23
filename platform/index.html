@@ -100,6 +100,8 @@
               <div class="camera-stage" id="camera-stage">
                 <div class="camera-placeholder" id="camera-placeholder"><span class="camera-placeholder-icon">◉</span><strong>Ton aperçu apparaîtra ici</strong><p>Active ta caméra pour te voir pendant la vidéo.</p></div>
                 <video id="webcam-feed" autoplay playsinline muted hidden></video>
+                <canvas id="hand-overlay" aria-hidden="true" hidden></canvas>
+                <span class="hand-overlay-status" id="hand-overlay-status" hidden></span>
                 <span class="live-badge" id="live-badge" hidden><i></i> EN DIRECT</span>
               </div>
               <div class="camera-controls"><button class="button button-primary" id="camera-start">Activer ma caméra</button><button class="button button-soft" id="camera-stop" hidden>Éteindre la caméra</button><button class="button button-soft" id="practice-record" disabled>Enregistrer mon essai</button><span class="camera-note">L’essai est envoyé au serveur local pour analyse, puis supprimé.</span></div>
@@ -136,6 +138,6 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app.js?v=9"></script>
+    <script src="app.js?v=10"></script>
   </body>
 </html>

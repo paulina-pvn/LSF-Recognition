@@ -101,6 +101,8 @@ h1 { font-size: 27px; letter-spacing: -.7px; }
 .reference-stage video { background: #17151d; }
 .camera-stage { background: #efedf3; }
 .camera-stage video { object-fit: cover; transform: scaleX(-1); }
+.camera-stage #hand-overlay { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); pointer-events: none; }
+.hand-overlay-status { position: absolute; top: 10px; left: 10px; max-width: calc(100% - 20px); padding: 6px 8px; border-radius: 5px; background: #ffffffdf; color: #575264; font-size: 8px; }
 .reference-stage .media-type { z-index: 1; }
 .reference-empty { color: #9691a1; font-size: 11px; }
 .camera-placeholder { display: grid; justify-items: center; gap: 8px; padding: 20px; text-align: center; }

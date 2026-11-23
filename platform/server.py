@@ -15,7 +15,7 @@ from urllib.parse import quote
 
 import cv2
 import numpy as np
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_file, send_from_directory
 
 
 PLATFORM_DIR = Path(__file__).resolve().parent
@@ -247,6 +247,14 @@ def health():
             else []
         ),
     )
+
+
+@app.get("/api/hand-landmarker-model")
+def hand_landmarker_model():
+    model_path = RECOGNISER_DIR / "models" / "hand_landmarker.task"
+    if not model_path.is_file():
+        return jsonify(error="Le modèle MediaPipe pour les mains est introuvable."), 404
+    return send_file(model_path, mimetype="application/octet-stream", conditional=True)
 
 
 @app.get("/api/signs")

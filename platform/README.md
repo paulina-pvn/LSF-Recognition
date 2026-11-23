@@ -37,7 +37,7 @@ La page **Ma bibliothèque** affiche les classes du jeu de vidéos qui se trouve
 
 Une vidéo ajoutée par l’utilisateur est enregistrée dans le navigateur et copiée dans Sign-Language-Recognition--MediaPipe-DTW/data/videos/user_uploads/, puis ses points MediaPipe sont extraits pour que le DTW puisse la comparer. Les anciennes vidéos déjà présentes dans la bibliothèque sont également ajoutées au reconnaisseur au premier essai. Ces fichiers ne sont pas envoyés sur GitHub : ils restent sur cet ordinateur. Une photo reste un support visuel uniquement. Les vidéos devraient être courtes et ne contenir qu’un seul signe. Une seule vidéo personnelle peut servir de référence de départ ; ajoute plusieurs prises pour rendre la reconnaissance moins sensible à une seule façon de signer.
 
-Pendant la pratique, le site envoie l’essai au serveur local et affiche le signe prédit. L’essai est temporaire et supprimé après analyse. Le navigateur et le serveur doivent rester sur le même ordinateur pour cette version.
+Pendant la pratique, le navigateur MediaPipe Tasks affiche les points et connexions des deux mains sur l’aperçu webcam en direct. Le runtime WebAssembly est chargé depuis jsDelivr (connexion Internet requise au premier chargement) ; le modèle de détection est servi par le serveur local. En parallèle, le site envoie l’essai au serveur local DTW et affiche le signe prédit. L’essai est temporaire et supprimé après analyse. Le navigateur et le serveur doivent rester sur le même ordinateur pour cette version.
 
 Depuis la racine du dépôt :
 

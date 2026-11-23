@@ -16,9 +16,94 @@ let recognizerReady = false;
 let healthPollTimer = null;
 let referenceObjectUrl = null;
 let toastTimer;
+let handLandmarker = null;
+let handOverlayFrame = null;
+let lastOverlayVideoTime = -1;
+
+const HAND_CONNECTIONS = [
+  [0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8],
+  [0, 9], [9, 10], [10, 11], [11, 12], [0, 13], [13, 14], [14, 15], [15, 16],
+  [0, 17], [17, 18], [18, 19], [19, 20], [5, 9], [9, 13], [13, 17], [5, 17],
+];
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
+
+async function ensureHandLandmarker() {
+  if (handLandmarker) return handLandmarker;
+  const { FilesetResolver, HandLandmarker } = await import(
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.mjs"
+  );
+  const vision = await FilesetResolver.forVisionTasks(
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm"
+  );
+  handLandmarker = await HandLandmarker.createFromOptions(vision, {
+    baseOptions: { modelAssetPath: "/api/hand-landmarker-model" },
+    runningMode: "VIDEO",
+    numHands: 2,
+    minHandDetectionConfidence: 0.5,
+    minHandPresenceConfidence: 0.5,
+    minTrackingConfidence: 0.5,
+  });
+  return handLandmarker;
+}
+
+function drawHandLandmarks(result) {
+  const feed = $("#webcam-feed");
+  const canvas = $("#hand-overlay");
+  const context = canvas.getContext("2d");
+  if (canvas.width !== feed.videoWidth || canvas.height !== feed.videoHeight) {
+    canvas.width = feed.videoWidth;
+    canvas.height = feed.videoHeight;
+  }
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  for (const landmarks of result.landmarks || []) {
+    context.lineWidth = Math.max(2, canvas.width / 240);
+    context.strokeStyle = "#d8c8ff";
+    for (const [from, to] of HAND_CONNECTIONS) {
+      context.beginPath();
+      context.moveTo(landmarks[from].x * canvas.width, landmarks[from].y * canvas.height);
+      context.lineTo(landmarks[to].x * canvas.width, landmarks[to].y * canvas.height);
+      context.stroke();
+    }
+    for (const point of landmarks) {
+      context.beginPath();
+      context.arc(point.x * canvas.width, point.y * canvas.height, Math.max(3, canvas.width / 150), 0, Math.PI * 2);
+      context.fillStyle = "#8c72d6";
+      context.fill();
+      context.lineWidth = Math.max(1, canvas.width / 480);
+      context.strokeStyle = "#ffffff";
+      context.stroke();
+    }
+  }
+}
+
+async function startHandOverlay() {
+  const canvas = $("#hand-overlay");
+  const status = $("#hand-overlay-status");
+  status.hidden = false;
+  status.textContent = "Chargement du suivi des mains…";
+  try {
+    const detector = await ensureHandLandmarker();
+    if (!cameraStream) return;
+    canvas.hidden = false;
+    status.textContent = "Points et squelette des mains actifs";
+    const detectFrame = () => {
+      if (!cameraStream) return;
+      const feed = $("#webcam-feed");
+      if (feed.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && feed.currentTime !== lastOverlayVideoTime) {
+        lastOverlayVideoTime = feed.currentTime;
+        drawHandLandmarks(detector.detectForVideo(feed, performance.now()));
+      }
+      handOverlayFrame = requestAnimationFrame(detectFrame);
+    };
+    detectFrame();
+  } catch (error) {
+    canvas.hidden = true;
+    status.textContent = `Suivi indisponible : ${error.message || error}`;
+    console.error("Could not initialize MediaPipe hand overlay", error);
+  }
+}
 
 function openDatabase() {
   return new Promise((resolve, reject) => {
@@ -298,6 +383,9 @@ async function openPracticePage() {
 }
 
 function stopCamera() {
+  if (handOverlayFrame !== null) cancelAnimationFrame(handOverlayFrame);
+  handOverlayFrame = null;
+  lastOverlayVideoTime = -1;
   if (mediaRecorder?.state === "recording") mediaRecorder.stop();
   mediaRecorder = null;
   recordedChunks = [];
@@ -305,6 +393,13 @@ function stopCamera() {
   cameraStream = null;
   const feed = $("#webcam-feed");
   if (!feed) return;
+  const overlay = $("#hand-overlay");
+  if (overlay) {
+    overlay.getContext("2d").clearRect(0, 0, overlay.width, overlay.height);
+    overlay.hidden = true;
+  }
+  const overlayStatus = $("#hand-overlay-status");
+  if (overlayStatus) overlayStatus.hidden = true;
   feed.srcObject = null;
   feed.hidden = true;
   $("#camera-placeholder").hidden = false;
@@ -344,6 +439,7 @@ async function enableCamera() {
     $("#camera-status").classList.add("active");
     $("#camera-status").lastChild.textContent = " Caméra active";
     await feed.play();
+    startHandOverlay();
     $("#practice-record").disabled = !recognizerReady;
   } catch (error) {
     stopCamera();
